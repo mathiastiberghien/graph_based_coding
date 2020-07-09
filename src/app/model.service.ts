@@ -37,8 +37,13 @@ export class ModelService implements OnDestroy {
         ]
       },
       {
+        name: 'Media',
+        keys: [{name: 'title', type: 'string'}]
+      },
+      {
         name: 'Movie',
-        keys: [{name: 'title', type: 'string'}, {name: 'roles', isArray: true, type: 'instance', model: 'Role'}],
+        extends: ['Media'],
+        keys: [{name: 'roles', isArray: true, type: 'instance', model: 'Role'}],
         instances: [
           {id: 'm1', properties: [{key: 'title', values: ['The Matrix']}, {key: 'roles', values: ['r1']}]},
           {id: 'm2', properties: [{key: 'title', values: ['Harry Potter']}, {key: 'roles', values: ['r2', 'r3']}]}
@@ -54,11 +59,15 @@ export class ModelService implements OnDestroy {
     const session = this.driver.session();
     try{
       const query = 'WITH {} as dummy ' +
-      'OPTIONAL MATCH (n:Type) WHERE NOT (n)<-[:HAS_TYPE]-(:Key) ' +
+      'OPTIONAL MATCH (n:KeyValuePair) WHERE NOT (n)<-[:HAS_KEYVALUE_PAIR]-(:Instance)-[:IS_INSTANCE_OF]->(:Model) ' +
       'OPTIONAL MATCH (n)-[r]-() ' +
       'DELETE r, n ' +
       'WITH {} as dummy ' +
-      'OPTIONAL MATCH (n:KeyValuePair) WHERE NOT (n)<-[:HAS_KEYVALUE_PAIR]-(:Instance)-[:IS_INSTANCE_OF]->(:Model) ' +
+      'OPTIONAL MATCH (n:Key) WHERE NOT (n)<-[:HAS_KEY]-() ' +
+      'OPTIONAL MATCH (n)-[r]-() ' +
+      'DELETE r, n ' +
+      'WITH {} as dummy ' +
+      'OPTIONAL MATCH (n:Type) WHERE NOT (n)<-[:HAS_TYPE]-(:Key) ' +
       'OPTIONAL MATCH (n)-[r]-() ' +
       'DELETE r, n ' +
       'WITH {} as dummy ' +
@@ -81,7 +90,8 @@ export class ModelService implements OnDestroy {
         const query = 'UNWIND $models as model ' +
         'WITH collect(model) as models, collect(model.name) as names ' +
         'OPTIONAL MATCH (n:Model) WHERE NOT n.name IN names ' +
-        'OPTIONAL MATCH ()-[r1]-(n)<-[:IS_INSTANCE_OF]-(i:Instance)-[r2]-() ' +
+        'OPTIONAL MATCH (n)-[r1]-() ' +
+        'OPTIONAL MATCH (n)<-[:IS_INSTANCE_OF]-(i:Instance)-[r2]-() ' +
         'DELETE r2, r1, n ' +
         'WITH models ' +
         'UNWIND models as model ' +
@@ -112,15 +122,20 @@ export class ModelService implements OnDestroy {
         'MATCH (m:Model{name:model.name}) ' +
         'MERGE (i:Instance{id:instance.id}) ' +
         'MERGE (i)-[:IS_INSTANCE_OF]->(m) ' +
-        'WITH instance, i, m ' +
+        'WITH DISTINCT model, instance, i, m ' +
         'UNWIND instance.properties as kvp ' +
-        'WITH DISTINCT instance, i, m, collect(kvp.key) as keys ' +
+        'WITH DISTINCT model, instance, i, m, collect(kvp.key) as keys ' +
         'OPTIONAL MATCH (i)-[r:HAS_KEYVALUE_PAIR]->(rkvp:KeyValuePair)-[:HAS_KEY]->(k:Key) WHERE NOT k.name IN keys ' +
         'DELETE r ' +
-        'WITH DISTINCT instance, i, m ' +
+        'WITH DISTINCT instance, i, m, model ' +
+        'OPTIONAL MATCH (p:Model) WHERE p.name in model.extends ' +
+        'MERGE (m)-[:EXTENDS]->(p) ' +
+        'WITH DISTINCT instance, i, m, p ' +
+        'UNWIND [m, p] as model ' +
+        'WITH DISTINCT instance, i, model as m ' +
         'UNWIND instance.properties as kvp ' +
         'MATCH (k:Key{name:kvp.key})<-[:HAS_KEY]-(m) ' +
-        'WITH i,k, kvp.values as values ' +
+        'WITH DISTINCT i,k, kvp.values as values ' +
         'OPTIONAL MATCH (i)-[:HAS_KEYVALUE_PAIR]->(kvp:KeyValuePair)-[:HAS_KEY]->(k) ' +
         'OPTIONAL MATCH (kvp)-[r2:HAS_VALUE]->(v:Instance) WHERE NOT v.id IN values ' +
         'DELETE r2 ' +
@@ -128,23 +143,7 @@ export class ModelService implements OnDestroy {
         'UNWIND values as value ' +
         'MERGE (inst:Instance{id:value}) ' +
         'MERGE (k)<-[:HAS_KEY]-(kvp:KeyValuePair)<-[:HAS_KEYVALUE_PAIR]-(i) ' +
-        'MERGE (kvp)-[:HAS_VALUE]->(inst) ' +
-        'WITH {} as dummy ' +
-        'OPTIONAL MATCH (n:Key) WHERE NOT (n)<-[:HAS_KEY]-() ' +
-        'OPTIONAL MATCH (n)-[r]-() ' +
-        'DELETE r, n ' +
-        'WITH {} as dummy ' +
-        'OPTIONAL MATCH (n:Type) WHERE NOT (n)<-[:HAS_TYPE]-(:Key) ' +
-        'OPTIONAL MATCH (n)-[r]-() ' +
-        'DELETE r, n ' +
-        'WITH {} as dummy ' +
-        'OPTIONAL MATCH (n:KeyValuePair) WHERE NOT (n)<-[:HAS_KEYVALUE_PAIR]-(:Instance)-[:IS_INSTANCE_OF]->(:Model) ' +
-        'OPTIONAL MATCH (n)-[r]-() ' +
-        'DELETE r, n ' +
-        'WITH {} as dummy ' +
-        'OPTIONAL MATCH (n:Instance) WHERE NOT (n)<-[:HAS_VALUE]-(:KeyValuePair) AND NOT (n)-[:IS_INSTANCE_OF]->(:Model) ' +
-        'OPTIONAL MATCH (n)-[r]-() ' +
-        'DELETE r, n';
+        'MERGE (kvp)-[:HAS_VALUE]->(inst)';
         const result = await session.run(
           query,
           {name: 'models', models}

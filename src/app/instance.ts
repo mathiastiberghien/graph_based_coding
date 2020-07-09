@@ -21,6 +21,7 @@ export interface KeyValuePair{
 
 export interface DBModel{
     name: string;
+    extends?: string[];
     keys: Key[];
     instances?: DBInstance[];
 }
