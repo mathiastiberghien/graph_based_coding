@@ -1,0 +1,6 @@
+<h3>Movies</h3>
+<div class="item" *ngFor="let movie of movies">
+    <span>{{movie.instance.id}}</span>
+    <span>{{movie.value.title}}</span>
+    <app-role-list [movie]="movie.value"></app-role-list>
+</div>
