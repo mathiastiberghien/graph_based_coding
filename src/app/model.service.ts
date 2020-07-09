@@ -24,7 +24,8 @@ export class ModelService implements OnDestroy {
         instances: [
           {id: 'p1', properties: [{key: 'firstName', values: ['Keanu']}, {key: 'surname', values: ['Reeves']}]},
           {id: 'p2', properties: [{key: 'firstName', values: ['Emma']}, {key: 'surname', values: ['Watson']}]},
-          {id: 'p3', properties: [{key: 'firstName', values: ['Daniel']}, {key: 'surname', values: ['Radcliffe']}]}
+          {id: 'p3', properties: [{key: 'firstName', values: ['Daniel']}, {key: 'surname', values: ['Radcliffe']}]},
+          {id: 'p4', properties: [{key: 'firstName', values: ['Hermann']}, {key: 'surname', values: ['Melville']}]}
         ]
       },
       {
@@ -47,6 +48,22 @@ export class ModelService implements OnDestroy {
         instances: [
           {id: 'm1', properties: [{key: 'title', values: ['The Matrix']}, {key: 'roles', values: ['r1']}]},
           {id: 'm2', properties: [{key: 'title', values: ['Harry Potter']}, {key: 'roles', values: ['r2', 'r3']}]}
+        ]
+      },
+      {
+        name: 'Item',
+        isEquivalentTo: ['Media'],
+        keys: [{name: 'name', isMappedTo: 'title', type: 'string'}],
+        instances: [
+          {id: 'i1', properties: [{key: 'name', values: ['Item 1']}]}
+        ]
+      },
+      {
+        name: 'Book',
+        extends: ['Media'],
+        keys: [{name: 'autor', type: 'string'}],
+        instances: [
+          {id: 'b1', properties: [{key: 'title', values: ['Moby Dick']}]}
         ]
       }
       ];
