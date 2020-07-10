@@ -1,9 +1,7 @@
 import { Component, OnInit, Input } from '@angular/core';
 import { ModelService } from '../model.service';
-import { Movie } from '../movie';
+import { Movie } from '../media';
 import {Role} from '../role';
-import {Instance} from '../instance';
-import { Person } from '../person';
 
 @Component({
   selector: 'app-role-list',

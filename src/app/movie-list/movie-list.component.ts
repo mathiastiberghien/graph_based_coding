@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import {ModelService} from '../model.service';
-import {Instance} from '../instance';
-import {Movie} from '../movie';
+import {Instance} from '../database';
+import {Movie} from '../media';
 
 @Component({
   selector: 'app-movie-list',
@@ -13,7 +13,6 @@ export class MovieListComponent implements OnInit {
   constructor(
     private modelService: ModelService
   ) {
-      this.modelService.buildSample();
    }
 
   async ngOnInit(): Promise<void> {

@@ -1,5 +1,5 @@
 import {Person} from './person';
-import { InstanceRef } from './instance';
+import { InstanceRef } from './database';
 
 export interface Role{
     character: string;

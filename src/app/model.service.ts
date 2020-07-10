@@ -1,9 +1,6 @@
 import { Injectable, OnDestroy } from '@angular/core';
-import {Movie} from './movie';
-import {Instance, Record, KeyValuePair, InstanceRef, DBModel} from './instance';
+import {Instance, Record, KeyValuePair, InstanceRef, DBModel} from './database';
 import * as neo4j from 'neo4j-driver';
-import { Role } from './role';
-import { Title } from '@angular/platform-browser';
 
 @Injectable({
   providedIn: 'root'
@@ -25,16 +22,18 @@ export class ModelService implements OnDestroy {
           {id: 'p1', properties: [{key: 'firstName', values: ['Keanu']}, {key: 'surname', values: ['Reeves']}]},
           {id: 'p2', properties: [{key: 'firstName', values: ['Emma']}, {key: 'surname', values: ['Watson']}]},
           {id: 'p3', properties: [{key: 'firstName', values: ['Daniel']}, {key: 'surname', values: ['Radcliffe']}]},
-          {id: 'p4', properties: [{key: 'firstName', values: ['Hermann']}, {key: 'surname', values: ['Melville']}]}
+          {id: 'p4', properties: [{key: 'firstName', values: ['Herman']}, {key: 'surname', values: ['Melville']}]},
+          {id: 'p5', properties: [{key: 'firstName', values: ['Carie-Anne']}, {key: 'surname', values: ['Moss']}]}
         ]
       },
       {
         name: 'Role',
-        keys: [{name: 'character', type: 'string'}, {name: 'actor', type: 'instance', model: 'Person'}],
+        keys: [{name: 'character', type: 'string'}, {name: 'actor', type: 'object', model: 'Person'}],
         instances: [
           {id: 'r1', properties: [{key: 'character', values: ['Neo']}, {key: 'actor', values: ['p1']}]},
           {id: 'r2', properties: [{key: 'character', values: ['Hermione Granger']}, {key: 'actor', values: ['p2']}]},
-          {id: 'r3', properties: [{key: 'character', values: ['Harry Potter']}, {key: 'actor', values: ['p3']}]}
+          {id: 'r3', properties: [{key: 'character', values: ['Harry Potter']}, {key: 'actor', values: ['p3']}]},
+          {id: 'r4', properties: [{key: 'character', values: ['Trinity']}, {key: 'actor', values: ['p5']}]}
         ]
       },
       {
@@ -44,9 +43,9 @@ export class ModelService implements OnDestroy {
       {
         name: 'Movie',
         extends: ['Media'],
-        keys: [{name: 'roles', isArray: true, type: 'instance', model: 'Role'}],
+        keys: [{name: 'title', type: 'string'},  {name: 'roles', isArray: true, type: 'object', model: 'Person'}],
         instances: [
-          {id: 'm1', properties: [{key: 'title', values: ['The Matrix']}, {key: 'roles', values: ['r1']}]},
+          {id: 'm1', properties: [{key: 'title', values: ['The Matrix']}, {key: 'roles', values: ['r1', 'r4']}]},
           {id: 'm2', properties: [{key: 'title', values: ['Harry Potter']}, {key: 'roles', values: ['r2', 'r3']}]}
         ]
       },
@@ -61,9 +60,9 @@ export class ModelService implements OnDestroy {
       {
         name: 'Book',
         extends: ['Media'],
-        keys: [{name: 'autor', type: 'string'}],
+        keys: [{name: 'author', type: 'object', model: 'Person'}],
         instances: [
-          {id: 'b1', properties: [{key: 'title', values: ['Moby Dick']}]}
+          {id: 'b1', properties: [{key: 'title', values: ['Moby Dick']}, {key: 'author', values: ['p4']}]}
         ]
       }
       ];
@@ -75,8 +74,7 @@ export class ModelService implements OnDestroy {
   async clearUnusedObjects(): Promise<void>{
     const session = this.driver.session();
     try{
-      const query = 'WITH {} as dummy ' +
-      'OPTIONAL MATCH (n:KeyValuePair) WHERE NOT (n)<-[:HAS_KEYVALUE_PAIR]-(:Instance)-[:IS_INSTANCE_OF]->(:Model) ' +
+      const query = 'OPTIONAL MATCH (n:KeyValuePair) WHERE NOT (n)<-[:HAS_KEYVALUE_PAIR]-(:Instance)-[:IS_INSTANCE_OF]->(:Model) ' +
       'OPTIONAL MATCH (n)-[r]-() ' +
       'DELETE r, n ' +
       'WITH {} as dummy ' +
@@ -94,6 +92,7 @@ export class ModelService implements OnDestroy {
       const result = await session.run(
         query
       );
+      console.log({'clear db changes': result.summary.counters.containsUpdates() ? result.summary.counters.updates() : 'No change'});
     }
     finally{
       await session.close();
@@ -114,16 +113,28 @@ export class ModelService implements OnDestroy {
         'UNWIND models as model ' +
         'MERGE (m:Model{name:model.name}) ' +
         'WITH model, m ' +
+        'OPTIONAL MATCH (m)-[r:IS_EQUIVALENT]->(em:Model) WHERE model.isEquivalentTo IS NULL OR  NOT em.name in model.isEquivalentTo ' +
+        'DELETE r ' +
+        'WITH DISTINCT model, m ' +
+        'OPTIONAL MATCH (em:Model) WHERE em.name in model.isEquivalentTo ' +
+        'MERGE (m)-[:IS_EQUIVALENT]->(em) ' +
+        'WITH DISTINCT model, m ' +
         'UNWIND model.keys as key ' +
         'MERGE (k:Key{name:key.name, isArray: CASE WHEN key.isArray IS NOT NULL THEN key.isArray ELSE false END}) ' +
         'MERGE (t:Type{name:key.type}) ' +
-        'WITH model,m,k,t, key.model as modelType ' +
+        'WITH model, m,k,t, key ' +
+        'OPTIONAL MATCH (k)-[r:IS_MAPPED]->(mk:Key) WHERE key.isMappedTo IS NULL OR  mk.name <> key.isMappedTo ' +
+        'DELETE r ' +
+        'WITH DISTINCT model, m,k,t, key ' +
+        'OPTIONAL MATCH (mk:Key) WHERE mk.name = key.isMappedTo ' +
+        'MERGE (k)-[:IS_MAPPED]->(mk) ' +
+        'WITH DISTINCT model,m,k,t, key.model as modelType ' +
         'MERGE (m)-[:HAS_KEY]->(k) ' +
         'MERGE (k)-[:HAS_TYPE]->(t) ' +
         'WITH model,m,k, modelType, t ' +
         'OPTIONAL MATCH (k)-[r:HAS_TYPE]->(rt:Type) WHERE rt <> t ' +
         'DELETE r ' +
-        'WITH model, m ,k, modelType ' +
+        'WITH DISTINCT model, m ,k, modelType ' +
         'OPTIONAL MATCH (mt:Model{name:modelType}) ' +
         'MERGE (k)-[:HAS_MODELTYPE]->(mt) ' +
         'WITH DISTINCT model,m, collect (k.name) as keys ' +
@@ -143,6 +154,9 @@ export class ModelService implements OnDestroy {
         'UNWIND instance.properties as kvp ' +
         'WITH DISTINCT model, instance, i, m, collect(kvp.key) as keys ' +
         'OPTIONAL MATCH (i)-[r:HAS_KEYVALUE_PAIR]->(rkvp:KeyValuePair)-[:HAS_KEY]->(k:Key) WHERE NOT k.name IN keys ' +
+        'DELETE r ' +
+        'WITH DISTINCT instance, i, m, model ' +
+        'OPTIONAL MATCH (m)-[r:EXTENDS]->(p:Model) WHERE model.extends IS NULL OR  NOT p.name in model.extends ' +
         'DELETE r ' +
         'WITH DISTINCT instance, i, m, model ' +
         'OPTIONAL MATCH (p:Model) WHERE p.name in model.extends ' +
@@ -165,6 +179,8 @@ export class ModelService implements OnDestroy {
           query,
           {name: 'models', models}
         );
+        console.log({'update db model changes' : result.summary.counters.containsUpdates() ?
+         result.summary.counters.updates() : 'No change'});
       }
       finally{
         await session.close();

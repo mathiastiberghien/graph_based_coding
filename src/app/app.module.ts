@@ -6,7 +6,10 @@ import { AppComponent } from './app.component';
 import { TopBarComponent } from './top-bar/top-bar.component';
 import { MovieListComponent } from './movie-list/movie-list.component';
 import { RoleListComponent } from './role-list/role-list.component';
-import { ActorComponent } from './actor/actor.component';
+import { PersonComponent } from './person/person.component';
+import { BookListComponent } from './book-list/book-list.component';
+import { MediaListComponent } from './media-list/media-list.component';
+import { ItemListComponent } from './item-list/item-list.component';
 
 @NgModule({
   declarations: [
@@ -14,7 +17,10 @@ import { ActorComponent } from './actor/actor.component';
     TopBarComponent,
     MovieListComponent,
     RoleListComponent,
-    ActorComponent
+    PersonComponent,
+    BookListComponent,
+    MediaListComponent,
+    ItemListComponent
   ],
   imports: [
     BrowserModule,

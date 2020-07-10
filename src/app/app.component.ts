@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { ModelService } from './model.service';
 
 @Component({
   selector: 'app-root',
@@ -7,4 +8,7 @@ import { Component } from '@angular/core';
 })
 export class AppComponent {
   title = 'graph-based-app';
+  constructor(private modelService: ModelService){
+    this.modelService.buildSample();
+  }
 }

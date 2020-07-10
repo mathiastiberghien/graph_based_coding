@@ -22,6 +22,7 @@ export interface KeyValuePair{
 export interface DBModel{
     name: string;
     extends?: string[];
+    isEquivalentTo?: string[];
     keys: Key[];
     instances?: DBInstance[];
 }
@@ -39,6 +40,7 @@ export interface DBInstance{
 export interface Key{
     name: string;
     type: string;
+    isMappedTo?: string;
     isArray?: boolean;
     model?: string;
 }
