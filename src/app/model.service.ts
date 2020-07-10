@@ -188,10 +188,6 @@ export class ModelService implements OnDestroy {
     }
   }
 
-  async ngOnDestroy(): Promise<void>{
-    await this.driver.close();
-  }
-
   async getInstances<T>(modelName: string,
                         filterInstances?: InstanceRef[],
                         recursiveDepth?: number,
@@ -264,5 +260,9 @@ export class ModelService implements OnDestroy {
       await session.close();
     }
     return [];
+  }
+
+  async ngOnDestroy(): Promise<void>{
+    await this.driver.close();
   }
 }
