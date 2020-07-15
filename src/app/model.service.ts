@@ -1,5 +1,6 @@
 import { Injectable, OnDestroy } from '@angular/core';
 import {Instance, Record, InstanceRef, DBModel} from './database';
+import {sample} from './sample';
 import * as neo4j from 'neo4j-driver';
 
 @Injectable({
@@ -13,94 +14,29 @@ export class ModelService implements OnDestroy {
     this.driver = neo4j.driver('bolt://localhost:7687', neo4j.auth.basic('neo4j', 'admin'));
   }
 
-  async buildSample(): Promise<void>{
-    const  models: DBModel[] = [
-      {
-        name: 'Person',
-        keys: [{name: 'firstName', type: 'string'}, {name: 'surname', type: 'string'}],
-        instances: [
-          {id: 'p1', properties: [{key: 'firstName', values: ['Keanu']}, {key: 'surname', values: ['Reeves']}]},
-          {id: 'p2', properties: [{key: 'firstName', values: ['Emma']}, {key: 'surname', values: ['Watson']}]},
-          {id: 'p3', properties: [{key: 'firstName', values: ['Daniel']}, {key: 'surname', values: ['Radcliffe']}]},
-          {id: 'p4', properties: [{key: 'firstName', values: ['Carie-Anne']}, {key: 'surname', values: ['Moss']}]},
-          {id: 'p5', properties: [{key: 'firstName', values: ['Herman']}, {key: 'surname', values: ['Melville']}]},
-        ]
-      },
-      {
-        name: 'Role',
-        keys: [{name: 'character', type: 'string'}, {name: 'actor', type: 'object', model: 'Person'}],
-        instances: [
-          {id: 'r1', properties: [{key: 'character', values: ['Neo']}, {key: 'actor', values: ['p1']}]},
-          {id: 'r2', properties: [{key: 'character', values: ['Hermione Granger']}, {key: 'actor', values: ['p2']}]},
-          {id: 'r3', properties: [{key: 'character', values: ['Harry Potter']}, {key: 'actor', values: ['p3']}]},
-          {id: 'r4', properties: [{key: 'character', values: ['Trinity']}, {key: 'actor', values: ['p4']}]}
-        ]
-      },
-      {
-        name: 'Media',
-        keys: [{name: 'title', type: 'string'}]
-      },
-      {
-        name: 'Movie',
-        extends: ['Media'],
-        keys: [{name: 'roles', isArray: true, type: 'object', model: 'Person'}],
-        instances: [
-          {id: 'm1', properties: [{key: 'title', values: ['The Matrix']}, {key: 'roles', values: ['r1', 'r4']}]},
-          {id: 'm2', properties: [{key: 'title', values: ['Harry Potter']}, {key: 'roles', values: ['r2', 'r3']}]}
-        ]
-      },
-      {
-        name: 'Book',
-        extends: ['Media'],
-        keys: [{name: 'author', type: 'object', model: 'Person'}],
-        instances: [
-          {id: 'b1', properties: [{key: 'title', values: ['Moby Dick']}, {key: 'author', values: ['p4']}]}
-        ]
-      },
-      {
-        name: 'Item',
-        isEquivalentTo: ['Media'],
-        keys: [{name: 'name', isMappedTo: 'title', type: 'string'}],
-        instances: [
-          {id: 'i1', properties: [{key: 'name', values: ['Item 1']}]}
-        ]
+  async buildSample(): Promise<{[key: string]: number}>{
+    const r1 = await this.createOrUpdateDBModels(sample);
+    const r2 = await this.clearUnusedObjects();
+    const r = {};
+    let hasUpdates = false;
+    for (const key in r1) {
+      if (Object.prototype.hasOwnProperty.call(r1, key)){
+        let val = r1[key];
+        if (Object.prototype.hasOwnProperty.call(r2, key)) {
+          val += r2[key];
+        }
+        hasUpdates = hasUpdates || val > 0;
+        if (val > 0){
+          r[key] = val;
+        }
       }
-      ];
-
-    await this.createDBModels(models);
-    await this.clearUnusedObjects();
+    }
+    console.log({changes: hasUpdates ? r : 'No changes'});
+    return r;
   }
 
-  async clearUnusedObjects(): Promise<void>{
-    const session = this.driver.session();
-    try{
-      const query = 'OPTIONAL MATCH (n:KeyValuePair) WHERE NOT (n)<-[:HAS_KEYVALUE_PAIR]-(:Instance)-[:IS_INSTANCE_OF]->(:Model) ' +
-      'OPTIONAL MATCH (n)-[r]-() ' +
-      'DELETE r, n ' +
-      'WITH {} as dummy ' +
-      'OPTIONAL MATCH (n:Key) WHERE NOT (n)<-[:HAS_KEY]-() ' +
-      'OPTIONAL MATCH (n)-[r]-() ' +
-      'DELETE r, n ' +
-      'WITH {} as dummy ' +
-      'OPTIONAL MATCH (n:Type) WHERE NOT (n)<-[:HAS_TYPE]-(:Key) ' +
-      'OPTIONAL MATCH (n)-[r]-() ' +
-      'DELETE r, n ' +
-      'WITH {} as dummy ' +
-      'OPTIONAL MATCH (n:Instance) WHERE NOT (n)<-[:HAS_VALUE]-(:KeyValuePair) AND NOT (n)-[:IS_INSTANCE_OF]->(:Model) ' +
-      'OPTIONAL MATCH (n)-[r]-() ' +
-      'DELETE r, n';
-      const result = await session.run(
-        query
-      );
-      console.log({'clear db changes': result.summary.counters.containsUpdates() ? result.summary.counters.updates() : 'No change'});
-    }
-    finally{
-      await session.close();
-    }
-  }
-
-  async createDBModels(models: DBModel[]): Promise<void>{
-    if (models && models.length){
+  private async createOrUpdateDBModels(models: DBModel[]): Promise<{[key: string]: number}>{
+    if (models){
       const session = this.driver.session();
       try{
         const query = 'UNWIND $models as model ' +
@@ -173,18 +109,45 @@ export class ModelService implements OnDestroy {
         'WITH DISTINCT i,k, values ' +
         'UNWIND values as value ' +
         'MERGE (inst:Instance{id:value}) ' +
-        'MERGE (k)<-[:HAS_KEY]-(kvp:KeyValuePair)<-[:HAS_KEYVALUE_PAIR]-(i) ' +
-        'MERGE (kvp)-[:HAS_VALUE]->(inst)';
+        'MERGE (k)<-[:HAS_KEY]-(kvp:KeyValuePair)-[:HAS_VALUE]->(inst) ' +
+        'MERGE (i)-[:HAS_KEYVALUE_PAIR]->(kvp)';
         const result = await session.run(
           query,
           {name: 'models', models}
         );
-        console.log({'update db model changes' : result.summary.counters.containsUpdates() ?
-         result.summary.counters.updates() : 'No change'});
+        return result.summary.counters.updates();
       }
       finally{
         await session.close();
       }
+    }
+  }
+
+  private async clearUnusedObjects(): Promise<{[key: string]: number}>{
+    const session = this.driver.session();
+    try{
+      const query = 'OPTIONAL MATCH (n:KeyValuePair) WHERE NOT (n)<-[:HAS_KEYVALUE_PAIR]-(:Instance)-[:IS_INSTANCE_OF]->(:Model) ' +
+      'OPTIONAL MATCH (n)-[r]-() ' +
+      'DELETE r, n ' +
+      'WITH {} as dummy ' +
+      'OPTIONAL MATCH (n:Key) WHERE NOT (n)<-[:HAS_KEY]-() ' +
+      'OPTIONAL MATCH (n)-[r]-() ' +
+      'DELETE r, n ' +
+      'WITH {} as dummy ' +
+      'OPTIONAL MATCH (n:Type) WHERE NOT (n)<-[:HAS_TYPE]-(:Key) ' +
+      'OPTIONAL MATCH (n)-[r]-() ' +
+      'DELETE r, n ' +
+      'WITH {} as dummy ' +
+      'OPTIONAL MATCH (n:Instance) WHERE NOT (n)<-[:HAS_VALUE]-(:KeyValuePair) AND NOT (n)-[:IS_INSTANCE_OF]->(:Model) ' +
+      'OPTIONAL MATCH (n)-[r]-() ' +
+      'DELETE r, n';
+      const result = await session.run(
+        query
+      );
+      return result.summary.counters.updates();
+    }
+    finally{
+      await session.close();
     }
   }
 
@@ -259,7 +222,6 @@ export class ModelService implements OnDestroy {
     } finally {
       await session.close();
     }
-    return [];
   }
 
   async ngOnDestroy(): Promise<void>{

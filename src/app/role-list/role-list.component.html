@@ -1,3 +1,3 @@
 <div *ngFor="let role of roles">
-        <span *ngIf = "role.character"><app-person [person]="role.actor"></app-person> ({{role.character}})</span>        
+        <span *ngIf = "role.actor"><app-person [person]="role.actor"></app-person><span *ngIf = "role.character"> as "{{role.character}}"</span></span>        
 </div>
