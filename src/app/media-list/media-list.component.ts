@@ -9,11 +9,10 @@ import { ModelService } from '../model.service';
   styleUrls: ['./media-list.component.css']
 })
 export class MediaListComponent implements OnInit {
-
   constructor(private modelService: ModelService) { }
   medialist: Instance<Book>[];
   async ngOnInit(): Promise<void> {
-    this.medialist = await this.modelService.getInstances('Media');
+    this.medialist = await this.modelService.getInstances('Media', null, 0);
   }
 
 }

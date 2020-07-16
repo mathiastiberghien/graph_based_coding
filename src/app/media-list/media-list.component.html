@@ -1,5 +1,5 @@
 <h3>Media</h3>
 <div class="item" *ngFor="let media of medialist">
     <span>{{media.instance.id}}</span>
-    <span>{{media.value.title}}</span>
+    <app-media [media]="media.value"></app-media>
 </div>

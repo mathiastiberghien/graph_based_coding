@@ -10,6 +10,7 @@ import { PersonComponent } from './person/person.component';
 import { BookListComponent } from './book-list/book-list.component';
 import { MediaListComponent } from './media-list/media-list.component';
 import { ItemListComponent } from './item-list/item-list.component';
+import { MediaComponent } from './media/media.component';
 
 @NgModule({
   declarations: [
@@ -20,7 +21,8 @@ import { ItemListComponent } from './item-list/item-list.component';
     PersonComponent,
     BookListComponent,
     MediaListComponent,
-    ItemListComponent
+    ItemListComponent,
+    MediaComponent
   ],
   imports: [
     BrowserModule,

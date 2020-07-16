@@ -1,6 +1,6 @@
 <h3>Books</h3>
 <div class="item" *ngFor="let book of books">
     <span>{{book.instance.id}}</span>
-    <span>{{book.value.title}}</span>
+    <app-media [media]="book.value"></app-media>
     <app-person [person]="book.value.author"></app-person>
 </div>

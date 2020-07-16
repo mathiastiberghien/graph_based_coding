@@ -14,7 +14,7 @@ age: number;
 
   ngOnInit(): void {
     if (this.person.dob){
-       this.age = moment(Date.now()).diff(moment(this.person.dob), 'years');
+      this.age = moment(Date.now()).diff(moment(this.person.dob), 'years');
     }
   }
 

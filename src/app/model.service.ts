@@ -59,11 +59,11 @@ export class ModelService implements OnDestroy {
         'MERGE (k:Key{name:key.name, isArray: CASE WHEN key.isArray IS NOT NULL THEN key.isArray ELSE false END}) ' +
         'MERGE (t:Type{name:key.type}) ' +
         'WITH model, m,k,t, key ' +
-        'OPTIONAL MATCH (k)-[r:IS_MAPPED]->(mk:Key) WHERE key.isMappedTo IS NULL OR  mk.name <> key.isMappedTo ' +
+        'OPTIONAL MATCH (k)-[r:IS_EQUIVALENT]->(mk:Key) WHERE key.isEquivalentTo IS NULL OR  mk.name <> key.isEquivalentTo ' +
         'DELETE r ' +
         'WITH DISTINCT model, m,k,t, key ' +
-        'OPTIONAL MATCH (mk:Key) WHERE mk.name = key.isMappedTo ' +
-        'MERGE (k)-[:IS_MAPPED]->(mk) ' +
+        'OPTIONAL MATCH (mk:Key) WHERE mk.name = key.isEquivalentTo ' +
+        'MERGE (k)-[:IS_EQUIVALENT]->(mk) ' +
         'WITH DISTINCT model,m,k,t, key.model as modelType ' +
         'MERGE (m)-[:HAS_KEY]->(k) ' +
         'MERGE (k)-[:HAS_TYPE]->(t) ' +
@@ -175,7 +175,7 @@ export class ModelService implements OnDestroy {
       (filter.length ? 'WHERE instance.id in $filter ' : '') +
       'WITH DISTINCT model,instance, key ' +
       'OPTIONAL MATCH (key)<-[:HAS_KEY]-(kvp:KeyValuePair)<-[:HAS_KEYVALUE_PAIR]-(instance) ' +
-      'OPTIONAL MATCH (key)-[:IS_MAPPED*..]-(original_key:Key)<-[:HAS_KEY]-(mapped_kvp:KeyValuePair)<-[:HAS_KEYVALUE_PAIR]-(instance) ' +
+      'OPTIONAL MATCH (key)-[:IS_EQUIVALENT*..]-(original_key:Key)<-[:HAS_KEY]-(mapped_kvp:KeyValuePair)<-[:HAS_KEYVALUE_PAIR]-(instance)' +
       'WITH kvp, mapped_kvp, key,original_key,instance, model ' +
       'UNWIND [kvp, mapped_kvp] as kvps ' +
       'WITH DISTINCT model, instance, kvps, key, original_key ' +

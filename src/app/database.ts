@@ -30,7 +30,7 @@ export interface DBModel{
 export interface DBKey{
     name: string; // Name of the key
     type: string; // Type of the key (should be on one of 'string', 'number', or 'object')
-    isMappedTo?: string; // Name of a mapped key
+    isEquivalentTo?: string; // Name of a equivalent key
     isArray?: boolean; // Stores the informations that defines if the key is a collection or a single object
     model?: string; // The name of the Model when the key represents instance of another Model
 }
