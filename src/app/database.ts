@@ -1,10 +1,10 @@
-export interface InstanceRef{
-    id: string; // Database instance id
-}
-
 export interface Instance<T>{
     instance: InstanceRef; // Instance reference
     value: T; // Instance client object
+}
+
+export interface InstanceRef{
+    id: string; // Database instance id
 }
 
 export interface Record{ // Db query result record
@@ -17,6 +17,7 @@ export interface KeyValuePair{ // Db query result keyvaluepair
     isArray?: boolean; // Stores the informations that defines if the key is a collection or a single object
     model?: string; // Model name if values are instances references
     values: any[]; // The values which should be number or string representing primitives or instance id
+    originalKey?: string; // The original key name if the instance came from on an equivalent model with an equivalent key
 }
 
 export interface DBModel{

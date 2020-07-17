@@ -169,7 +169,7 @@ export class ModelService implements OnDestroy {
       'WITH m, equivalent, key ' +
       'UNWIND [m, equivalent] as mod ' +
       'OPTIONAL MATCH (child:Model)-[:EXTENDS*..]->(mod) ' +
-      'WITH m, mod, child, key ' +
+      'WITH mod, child, key ' +
       'UNWIND [mod, child] as model ' +
       'MATCH (instance:Instance)-[:IS_INSTANCE_OF]->(model) ' +
       (filter.length ? 'WHERE instance.id in $filter ' : '') +

@@ -1,28 +1,52 @@
 //QUERY GET INSTANCES
 WITH 'Movie' as modelName
-MATCH (m:Model{name:modelName}) // Get Model
-OPTIONAL MATCH (k:Key)<-[:HAS_KEY]-(m) // Get Model keys
-OPTIONAL MATCH (pk:Key)<-[:HAS_KEY]-(:Model)<-[:EXTENDS*..]-(m) // Get keys from Models that selected model extends
+// Get Model
+MATCH (m:Model{name:modelName})
+// Get Model keys
+OPTIONAL MATCH (k:Key)<-[:HAS_KEY]-(m)
+// Get keys from Models that selected model extends
+OPTIONAL MATCH (pk:Key)<-[:HAS_KEY]-(:Model)<-[:EXTENDS*..]-(m)
 WITH m,k, pk
 UNWIND [k,pk] as key
 WITH DISTINCT m, key
-OPTIONAL MATCH (equivalent:Model)<-[:IS_EQUIVALENT]-(m) // Get the Models equivalent to the selected model
+// Get the Models equivalent to the selected model
+OPTIONAL MATCH (equivalent:Model)<-[:IS_EQUIVALENT]-(m)
 WITH m, equivalent, key
 UNWIND [m, equivalent] as mod
-OPTIONAL MATCH (child:Model)-[:EXTENDS*..]->(mod) // Get every child Model from selected model and equivalents
-WITH m, mod, child, key
+// Get every child Model from selected model and equivalents
+OPTIONAL MATCH (child:Model)-[:EXTENDS*..]->(mod)
+WITH mod, child, key
 UNWIND [mod, child] as model
-MATCH (instance:Instance)-[:IS_INSTANCE_OF]->(model) // Get instances from selected model, equivalents and children model
+// Get instances from selected model, equivalents and children model
+MATCH (instance:Instance)-[:IS_INSTANCE_OF]->(model)
 WITH DISTINCT model,instance, key
-OPTIONAL MATCH (key)<-[:HAS_KEY]-(kvp:KeyValuePair)<-[:HAS_KEYVALUE_PAIR]-(instance) // Get direct KeyValuePairs from instances
-OPTIONAL MATCH (key)-[:IS_EQUIVALENT*..]-(original_key:Key)<-[:HAS_KEY]-(mapped_kvp:KeyValuePair)<-[:HAS_KEYVALUE_PAIR]-(instance) // Get mapped KeyValuePairs from instances
+// Get direct KeyValuePairs from instances
+OPTIONAL MATCH (key)<-[:HAS_KEY]-(kvp:KeyValuePair)<-[:HAS_KEYVALUE_PAIR]-(instance)
+// Get mapped KeyValuePairs from instances
+OPTIONAL MATCH (key)-[:IS_EQUIVALENT*..]-(original_key:Key)<-[:HAS_KEY]-(mapped_kvp:KeyValuePair)<-[:HAS_KEYVALUE_PAIR]-(instance)
 WITH kvp, mapped_kvp, key,original_key,instance, model
 UNWIND [kvp, mapped_kvp] as kvps
 WITH DISTINCT model, instance, kvps, key, original_key
-MATCH (kvps)-[:HAS_VALUE]->(v:Instance) // Get KeyValuePair for each instance
-OPTIONAL MATCH (v)-[:IS_INSTANCE_OF]->(vm:Model) // Get instance Model (no model means that the instance is a primitive)
-WITH original_key,key, vm,{id:instance.id, model:model.name} as instanceInfo, collect (CASE WHEN vm IS NULL THEN v.id ELSE {id:v.id} END) as values // If the instance is a primitive the value is the id of the instance else the value is a reference to another instance
-RETURN {instance:instanceInfo, properties: collect ({key:key.name, originalKey: original_key.name,  model:vm.name, values:values,isArray: CASE WHEN original_key IS NOT NULL THEN (original_key.isArray IS NOT NULL AND original_key.isArray) ELSE ((key.isArray IS NOT NULL) AND key.isArray) END})} as instances // return a JSON collection representing each instance with properties
+// Get KeyValuePair for each instance
+MATCH (kvps)-[:HAS_VALUE]->(v:Instance)
+// Get instance Model (no model means that the instance is a primitive) 
+OPTIONAL MATCH (v)-[:IS_INSTANCE_OF]->(vm:Model)
+// If the instance is a primitive the value is the id of the instance else the value is a reference to another instance
+WITH original_key,key, vm,{id:instance.id, model:model.name} as instanceInfo, collect (CASE WHEN vm IS NULL THEN v.id ELSE {id:v.id} END) as values 
+// return a JSON collection representing each instance with properties
+RETURN {
+		instance:instanceInfo,
+		properties: collect ({
+								key:key.name,
+								originalKey: original_key.name,
+								model:vm.name,
+								values:values,
+								isArray: CASE WHEN original_key IS NOT NULL 
+										 THEN (original_key.isArray IS NOT NULL AND original_key.isArray) 
+										 ELSE ((key.isArray IS NOT NULL) AND key.isArray) 
+										 END
+								})
+		} as instances 
 ORDER BY instances.instance.id
 
 
@@ -93,64 +117,81 @@ WITH [
         ]
       }
     ]as models
-UNWIND models as model
+UNWIND $models as model
 WITH collect(model) as models, collect(model.name) as names
-OPTIONAL MATCH (n:Model) WHERE NOT n.name IN names // Search for Models that are not represented in the specification
+// Search for Models that are not represented in the specification
+OPTIONAL MATCH (n:Model) WHERE NOT n.name IN names
 OPTIONAL MATCH (n)-[r1]-()
-OPTIONAL MATCH (n)<-[:IS_INSTANCE_OF]-(i:Instance)-[r2]-() // Sear instances  of models that are not represented in the specification
-DELETE r2, r1, n // Remove models and their instance that are not represented in the specification
+// Search instances  of models that are not represented in the specification
+OPTIONAL MATCH (n)<-[:IS_INSTANCE_OF]-(i:Instance)-[r2]-()
+// Remove models and their relationships to instances that are not represented in the specification
+DELETE r2, r1, n
 WITH models
 UNWIND models as model
-MERGE (m:Model{name:model.name}) // Create models from specification when it doesn't exist
+// Create models from specification when it doesn't exist
+MERGE (m:Model{name:model.name})
 WITH model, m
-OPTIONAL MATCH (m)-[r:IS_EQUIVALENT]->(em:Model) WHERE model.isEquivalentTo IS NULL OR  NOT em.name in model.isEquivalentTo // Remove equivalency relationships that are not defined in the specification
+// Remove equivalency relationships that are not defined in the specification
+OPTIONAL MATCH (m)-[r:IS_EQUIVALENT]->(em:Model) WHERE model.isEquivalentTo IS NULL OR  NOT em.name in model.isEquivalentTo
 DELETE r
 WITH DISTINCT model, m
 OPTIONAL MATCH (em:Model) WHERE em.name in model.isEquivalentTo
-MERGE (m)-[:IS_EQUIVALENT]->(em) // Create equivalency relationships from the specification
+// Create equivalency relationships from the specification
+MERGE (m)-[:IS_EQUIVALENT]->(em)
 WITH DISTINCT model, m
 UNWIND model.keys as key
-MERGE (k:Key{name:key.name, isArray: CASE WHEN key.isArray IS NOT NULL THEN key.isArray ELSE false END}) // Create model keys from the specification
+// Create model keys from the specification
+MERGE (k:Key{name:key.name, isArray: CASE WHEN key.isArray IS NOT NULL THEN key.isArray ELSE false END})
 MERGE (t:Type{name:key.type})
 WITH model, m,k,t, key
-OPTIONAL MATCH (k)-[r:IS_EQUIVALENT]->(mk:Key) WHERE key.isEquivalentTo IS NULL OR  mk.name <> key.isEquivalentTo // Remove key mapping relationships that are not defined in the specification
+// Remove key mapping relationships that are not defined in the specification
+OPTIONAL MATCH (k)-[r:IS_EQUIVALENT]->(mk:Key) WHERE key.isEquivalentTo IS NULL OR  mk.name <> key.isEquivalentTo
 DELETE r
 WITH DISTINCT model, m,k,t, key
 OPTIONAL MATCH (mk:Key) WHERE mk.name = key.isEquivalentTo
-MERGE (k)-[:IS_EQUIVALENT]->(mk) // Create mapping relationships from the specification
+// Create mapping relationships from the specification
+MERGE (k)-[:IS_EQUIVALENT]->(mk)
 WITH DISTINCT model,m,k,t, key.model as modelType
 MERGE (m)-[:HAS_KEY]->(k)
 MERGE (k)-[:HAS_TYPE]->(t)
 WITH model,m,k, modelType, t
-OPTIONAL MATCH (k)-[r:HAS_TYPE]->(rt:Type) WHERE rt <> t // Remove key-type relationships that are not defined in the specification
+// Remove key-type relationships that are not defined in the specification
+OPTIONAL MATCH (k)-[r:HAS_TYPE]->(rt:Type) WHERE rt <> t
 DELETE r
 WITH DISTINCT model, m ,k, modelType
 OPTIONAL MATCH (mt:Model{name:modelType})
-MERGE (k)-[:HAS_MODELTYPE]->(mt) // Create key types relationships from the specification
+// Create key types relationships from the specification
+MERGE (k)-[:HAS_MODELTYPE]->(mt)
 WITH DISTINCT model,m, collect (k.name) as keys
-OPTIONAL MATCH (m)-[r:HAS_KEY]->(k:Key) WHERE NOT k.name in keys // Remove model-key relationships that are no defined in the specification
+// Remove model-key relationships that are no defined in the specification
+OPTIONAL MATCH (m)-[r:HAS_KEY]->(k:Key) WHERE NOT k.name in keys
 DELETE r
 WITH  DISTINCT model,m
 UNWIND model.instances as instance
 WITH DISTINCT model, m, collect(instance.id) as ids
-OPTIONAL MATCH (m)<-[r:IS_INSTANCE_OF]-(ri:Instance) WHERE NOT ri.id in ids // Remove model-instance relationships that are not defined in the specification
+// Remove model-instance relationships that are not defined in the specification
+OPTIONAL MATCH (m)<-[r:IS_INSTANCE_OF]-(ri:Instance) WHERE NOT ri.id in ids
 DELETE r
 WITH  DISTINCT model
 UNWIND model.instances as instance
 MATCH (m:Model{name:model.name})
 MERGE (i:Instance{id:instance.id})
-MERGE (i)-[:IS_INSTANCE_OF]->(m) // Create model-instance relationships that from the specification
+// Create model-instance relationships that from the specification
+MERGE (i)-[:IS_INSTANCE_OF]->(m)
 WITH DISTINCT model, instance, i, m
 UNWIND instance.properties as kvp
 WITH DISTINCT model, instance, i, m, collect(kvp.key) as keys
-OPTIONAL MATCH (i)-[r:HAS_KEYVALUE_PAIR]->(rkvp:KeyValuePair)-[:HAS_KEY]->(k:Key) WHERE NOT k.name IN keys // Remove instance-keyvaluepair relationships that are not defined in the specification
+// Remove instance-keyvaluepair relationships that are not defined in the specification
+OPTIONAL MATCH (i)-[r:HAS_KEYVALUE_PAIR]->(rkvp:KeyValuePair)-[:HAS_KEY]->(k:Key) WHERE NOT k.name IN keys
 DELETE r
 WITH DISTINCT instance, i, m, model
-OPTIONAL MATCH (m)-[r:EXTENDS]->(p:Model) WHERE model.extends IS NULL OR  NOT p.name in model.extends // Remove model extension relationships that are not defined in the specification
+// Remove model extension relationships that are not defined in the specification
+OPTIONAL MATCH (m)-[r:EXTENDS]->(p:Model) WHERE model.extends IS NULL OR  NOT p.name in model.extends
 DELETE r
 WITH DISTINCT instance, i, m, model
 OPTIONAL MATCH (p:Model) WHERE p.name in model.extends
-MERGE (m)-[:EXTENDS]->(p) // Create model extension relationships from the specification
+// Create model extension relationships from the specification
+MERGE (m)-[:EXTENDS]->(p) 
 WITH DISTINCT instance, i, m, p
 UNWIND [m, p] as model
 WITH DISTINCT instance, i, model as m
@@ -158,28 +199,36 @@ UNWIND instance.properties as kvp
 MATCH (k:Key{name:kvp.key})<-[:HAS_KEY]-(m)
 WITH DISTINCT i,k, kvp.values as values
 OPTIONAL MATCH (i)-[:HAS_KEYVALUE_PAIR]->(kvp:KeyValuePair)-[:HAS_KEY]->(k)
-OPTIONAL MATCH (kvp)-[r2:HAS_VALUE]->(v:Instance) WHERE NOT v.id IN values // Remove value-keyvaluepair relationships that are not defined in the specification
+// Remove value-keyvaluepair relationships that are not defined in the specification
+OPTIONAL MATCH (kvp)-[r2:HAS_VALUE]->(v:Instance) WHERE NOT v.id IN values 
 DELETE r2
 WITH DISTINCT i,k, values
 UNWIND values as value
-MERGE (inst:Instance{id:value}) // Create primitives when doesn't exist
-MERGE (k)<-[:HAS_KEY]-(kvp:KeyValuePair)-[:HAS_VALUE]->(inst) // Create keyvaluepair relationships from the specification
-MERGE (i)-[:HAS_KEYVALUE_PAIR]->(kvp) // Create keyvaluepair-instance relationships
+// Create primitives when doesn't exist
+MERGE (inst:Instance{id:value}) 
+// Create keyvaluepair relationships from the specification
+MERGE (k)<-[:HAS_KEY]-(kvp:KeyValuePair)-[:HAS_VALUE]->(inst) 
+// Create keyvaluepair-instance relationships
+MERGE (i)-[:HAS_KEYVALUE_PAIR]->(kvp) 
 
 // QUERY DELETE UNUSED OBJECTS
-OPTIONAL MATCH (n:KeyValuePair) WHERE NOT (n)<-[:HAS_KEYVALUE_PAIR]-(:Instance)-[:IS_INSTANCE_OF]->(:Model) // Remove KeyValuePair objects that are not associated with any instance
+// Remove KeyValuePair objects that are not associated with any instance
+OPTIONAL MATCH (n:KeyValuePair) WHERE NOT (n)<-[:HAS_KEYVALUE_PAIR]-(:Instance)-[:IS_INSTANCE_OF]->(:Model) 
 OPTIONAL MATCH (n)-[r]-()
 DELETE r, n
 WITH {} as dummy
-OPTIONAL MATCH (n:Key) WHERE NOT (n)<-[:HAS_KEY]-() // Remove Key objects that are not referenced
+// Remove Key objects that are not referenced
+OPTIONAL MATCH (n:Key) WHERE NOT (n)<-[:HAS_KEY]-() ed
 OPTIONAL MATCH (n)-[r]-()
 DELETE r, n
 WITH {} as dummy
-OPTIONAL MATCH (n:Type) WHERE NOT (n)<-[:HAS_TYPE]-(:Key) // Remove Type objects that are not referenced
+// Remove Type objects that are not referenced
+OPTIONAL MATCH (n:Type) WHERE NOT (n)<-[:HAS_TYPE]-(:Key)
 OPTIONAL MATCH (n)-[r]-()
 DELETE r, n
 WITH {} as dummy
-OPTIONAL MATCH (n:Instance) WHERE NOT (n)<-[:HAS_VALUE]-(:KeyValuePair) AND NOT (n)-[:IS_INSTANCE_OF]->(:Model) // Remove Instance objects that are not referenced
+// Remove Instance objects that are not referenced
+OPTIONAL MATCH (n:Instance) WHERE NOT (n)<-[:HAS_VALUE]-(:KeyValuePair) AND NOT (n)-[:IS_INSTANCE_OF]->(:Model) 
 OPTIONAL MATCH (n)-[r]-()
 DELETE r, n
 
