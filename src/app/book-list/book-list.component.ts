@@ -15,7 +15,7 @@ export class BookListComponent implements OnInit {
   ) { }
 
   async ngOnInit(): Promise<void> {
-    this.books = await this.modelService.getInstances<Book>('Book', null, 0);
+    this.books = await this.modelService.getInstances<Book>('Book');
   }
 
 }

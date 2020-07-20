@@ -195,12 +195,14 @@ export class ModelService implements OnDestroy {
             const r: Instance<T> = {instance: null, value: null};
             if (i){
               r.instance = i.instance;
+              if (typeof(recursiveDepth) === 'undefined' || recursiveDepth === null){
+                recursiveDepth = 0;
+              }
               if (i.properties && i.properties.length){
                   for (const element of i.properties) {
-                  if (typeof(recursiveDepth) === 'undefined' || recursiveDepth === null ||
+                  if (!element.model ||
                      recursiveDepth < 0 ||
-                      (recursiveDepth > 0 && currentDepth >= recursiveDepth) ||
-                       !element.model) {
+                      (recursiveDepth > 0 && currentDepth >= recursiveDepth) ) {
                   v[element.key] = element.isArray ? element.values : element.values[0];
                   }
                   else{

@@ -12,7 +12,7 @@ export class MediaListComponent implements OnInit {
   constructor(private modelService: ModelService) { }
   medialist: Instance<Book>[];
   async ngOnInit(): Promise<void> {
-    this.medialist = await this.modelService.getInstances('Media', null, 0);
+    this.medialist = await this.modelService.getInstances('Media');
   }
 
 }
