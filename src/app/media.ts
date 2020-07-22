@@ -2,15 +2,15 @@ import {Role} from './role';
 import { Person } from './person';
 import { DBDate} from './dbDate';
 
-export interface Movie extends Media{
-    roles: Role[];
-}
-
-export interface Media{
+export class Media{
     title: string;
     releaseDate?: DBDate;
 }
 
-export interface Book extends Media{
+export class Movie extends Media{
+    roles: Role[];
+}
+
+export class Book extends Media{
     author: Person;
 }

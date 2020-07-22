@@ -1,6 +1,6 @@
 import {Person} from './person';
 
-export interface Role{
+export class Role{
     character: string;
     actor: Person;
 }

@@ -1,4 +1,4 @@
-export interface DBDate{
+export class DBDate{
     year: number;
     month: number;
     day: number;

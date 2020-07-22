@@ -1,6 +1,6 @@
 import { DBDate } from './dbDate';
 
-export interface Person{
+export class Person{
     firstName: string;
     surname: string;
     dob?: DBDate;
